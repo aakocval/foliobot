@@ -1,0 +1,53 @@
+{
+  "$schema": "../schema/profile.schema.json",
+  "schemaVersion": 1,
+  "name": "Alex Example",
+  "headline": "Full-stack developer",
+  "location": "Manila, PH",
+  "bio": "Full-stack developer who builds web and mobile products. Replace this with two or three sentences about you.",
+  "availability": "Open to opportunities",
+  "contact": {
+    "email": "alex@example.com",
+    "links": [
+      { "label": "GitHub", "url": "https://github.com/example" },
+      { "label": "LinkedIn", "url": "https://www.linkedin.com/in/example/" }
+    ]
+  },
+  "skills": {
+    "summary": "Mostly TypeScript and Python, with React on the front end and FastAPI on the back end.",
+    "items": ["TypeScript", "Python", "React", "FastAPI"]
+  },
+  "projects": [
+    {
+      "name": "Sample App",
+      "type": "app",
+      "description": "A short, one-line description of what it does.",
+      "role": "Built the app from scratch.",
+      "stack": ["React", "FastAPI", "PostgreSQL"],
+      "stats": ["1,000+ users"],
+      "link": "https://example.com/sample-app"
+    },
+    {
+      "name": "Sample Site",
+      "type": "website",
+      "description": "A marketing site for a local business.",
+      "link": "https://example.com"
+    }
+  ],
+  "faqs": [
+    {
+      "q": "Are you open to relocation?",
+      "a": "Yes, open to relocating or working remotely.",
+      "keywords": ["relocate", "relocation", "remote"]
+    }
+  ],
+  "bot": {
+    "title": "Ask about Alex",
+    "greeting": "Hi! Ask me about Alex's projects, tech stack, or how to get in touch.",
+    "suggestions": [
+      "What projects has Alex built?",
+      "What's Alex's tech stack?",
+      "How can I contact Alex?"
+    ]
+  }
+}

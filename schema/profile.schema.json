@@ -1,0 +1,118 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Portfolio chat profile",
+  "description": "Everything the chatbot knows about one person. Only `schemaVersion` and `name` are required; the bot skips topics a profile does not cover. Everything here ends up in a public widget, so do not put private data (phone number, salary, home address) in it.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "name"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "schemaVersion": {
+      "description": "Version of this schema. Lets older files be migrated if the format changes.",
+      "const": 1
+    },
+    "name": { "type": "string", "minLength": 1, "description": "Display name, e.g. \"Val Moratalla\"." },
+    "headline": { "type": "string", "description": "One-line role, e.g. \"Software Engineer\"." },
+    "location": { "type": "string", "description": "e.g. \"Quezon City, PH\"." },
+    "bio": { "type": "string", "description": "Two or three sentences. Used for \"who is this / about\" questions." },
+    "availability": { "type": "string", "description": "e.g. \"Open to opportunities\". Shown with contact details." },
+
+    "contact": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "email": { "type": "string", "format": "email" },
+        "links": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/link" }
+        }
+      }
+    },
+
+    "skills": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "summary": { "type": "string", "description": "A short sentence answering \"what is your tech stack?\"." },
+        "items": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Individual skills. Mentioning any of them in a question also triggers the stack answer."
+        }
+      }
+    },
+
+    "projects": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/project" }
+    },
+
+    "faqs": {
+      "type": "array",
+      "description": "Anything that does not fit the other fields: relocation, timezone, rates, why the chatbot exists...",
+      "items": { "$ref": "#/definitions/faq" }
+    },
+
+    "bot": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "title": { "type": "string", "description": "Chat panel header. Defaults to \"Ask about <name>\"." },
+        "greeting": { "type": "string" },
+        "suggestions": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Quick-question buttons. Each should be answerable: a topic question, a project, or an faq `q`."
+        },
+        "declineMessage": { "type": "string", "description": "Reply to questions outside the bot's scope." }
+      }
+    }
+  },
+
+  "definitions": {
+    "link": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["label", "url"],
+      "properties": {
+        "label": { "type": "string", "minLength": 1 },
+        "url": { "type": "string", "format": "uri" }
+      }
+    },
+    "project": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "type": {
+          "enum": ["app", "website", "other"],
+          "description": "Groups the project list. Defaults to \"other\"."
+        },
+        "description": { "type": "string" },
+        "role": { "type": "string", "description": "What you did, e.g. \"Started the app from scratch and added new features.\"" },
+        "stack": { "type": "array", "items": { "type": "string" } },
+        "stats": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Free-form facts, e.g. \"1M+ downloads\", \"★ 4.6 (779 ratings)\"."
+        },
+        "link": { "type": "string", "format": "uri" }
+      }
+    },
+    "faq": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["q", "a"],
+      "properties": {
+        "q": { "type": "string", "minLength": 1, "description": "The question. Also matched exactly, so it can be used as a suggestion button." },
+        "a": { "type": "string", "minLength": 1 },
+        "keywords": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Words or phrases that trigger this answer in free text."
+        }
+      }
+    }
+  }
+}
