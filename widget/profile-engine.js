@@ -155,7 +155,8 @@
         var bot = objectOrEmpty(profile.bot);
         var config = {
             title: bot.title || 'Ask about ' + profile.name,
-            greeting: bot.greeting || "Hi! I'm a small assistant for this portfolio. Ask me about " + profile.name + ".",
+            // An explicit "" means "no greeting", so only a missing greeting gets the default.
+            greeting: typeof bot.greeting === 'string' ? bot.greeting : "Hi! I'm a small assistant for this portfolio. Ask me about " + profile.name + ".",
             suggestions: list(bot.suggestions).filter(isText),
             respond: createResponder(profile)
         };

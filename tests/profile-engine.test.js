@@ -62,6 +62,11 @@ test('bot settings and overrides win over defaults', () => {
     assert.deepEqual(cfg.position, { right: 1, bottom: 2 });
 });
 
+test('an empty greeting turns the greeting off instead of falling back to the default', () => {
+    assert.equal(fromProfile({ name: 'Sam', bot: { greeting: '' } }).greeting, '');
+    assert.equal(fromProfile({ name: 'Sam', bot: {} }).greeting, "Hi! I'm a small assistant for this portfolio. Ask me about Sam.");
+});
+
 test('a project named in the question returns its facts', () => {
     const answer = respond('What stack did Sam use on Intro.u?');
     assert.match(answer, /^Intro\.u - Meet people\./);

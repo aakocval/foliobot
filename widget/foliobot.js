@@ -24,20 +24,22 @@
  *
  * If both are given, `respond` wins.
  *
- * Public API:  FolioBot.init(config) / open() / close() / destroy()
+ * Public API:  FolioBot.init(config) / open() / close() / setTheme(theme, colors) / destroy()
  */
 (function (global) {
     'use strict';
 
     var DEFAULTS = {
         title: 'Chat',
-        greeting: 'Hi! How can I help?',
+        greeting: 'Hi! How can I help?', // first bot message; '' shows none
         suggestions: [],
         maxSuggestions: 3,            // quick-question links shown; extras in `suggestions` are ignored
         maxHeight: 400,               // px cap for the open panel; it grows with the chat up to this, then scrolls
         placeholder: 'Type your question...',
         launcherLabel: 'Open chat',
-        accent: '#b81828',            // hover and focus highlights only; the widget is otherwise neutral. A --fb-accent CSS variable on the page overrides it.
+        theme: 'auto',                // 'auto' follows the visitor's light/dark system setting; 'light' or 'dark' fixes it; 'custom' uses `colors`. Change it later with FolioBot.setTheme(). Defaults to 'custom' when only `colors` is given.
+        colors: null,                 // { background, text, accent } for theme 'custom'. --fb-bg / --fb-text on the page override it.
+        accent: null,                 // hover and focus colour in every theme. null brightens to the theme's text colour instead. A --fb-accent CSS variable on the page overrides it.
         zIndex: 200,                  // stacking order of the widget; raise it if your page has higher layers
         position: { right: 24, bottom: 24 }, // px offsets of the launcher from the viewport corner
         maxLength: 200,               // max characters a visitor can send per message
@@ -52,59 +54,84 @@
         endpoint: null
     };
 
+    var THEMES = ['auto', 'light', 'dark', 'custom'];
+
+    // A see-through tint of the text colour. Borders, bubbles and muted text are all drawn
+    // with it, so they follow whatever the text and background resolve to (light, dark or a
+    // page's own --fb-text / --fb-bg) without a separate colour for each.
+    function tint(percent) { return 'color-mix(in srgb, var(--_fg) ' + percent + '%, transparent)'; }
+    // Hover and focus colour. --_t-accent is set per theme below; with no accent configured it
+    // is the theme's own text colour, so the highlight stays neutral in light, dark and custom.
+    var ACCENT = 'var(--fb-accent, var(--_t-accent))';
+    var LIGHT_TOKENS = '--_t-bg: #fff; --_t-fg: #1d1d1f; --_t-shadow: rgba(0,0,0,.12); color-scheme: light;';
+
     // All widget CSS lives inside the shadow root, so the host page's styles
     // cannot leak in and ours cannot leak out. Custom properties (--fb-*) are
     // the only things that cross the boundary, which makes them the theming API.
     var STYLES = [
         ':host { all: initial; }',
         '*, *::before, *::after { box-sizing: border-box; }',
-        '.fb { font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Arial, sans-serif; font-size: 14px; line-height: 1.45; color: #f2f2f4; user-select: text; -webkit-user-select: text; }',
+
+        // Built-in palettes (--_t-*). Dark is the base; data-theme="light", or "auto" on a
+        // light-preferring system, swaps in the light one. color-scheme makes the caret and
+        // scrollbar match.
+        '.fb { --_t-bg: #2b2b2d; --_t-fg: #f2f2f4; --_t-shadow: rgba(0,0,0,.25); color-scheme: dark; }',
+        '.fb[data-theme="light"] { ' + LIGHT_TOKENS + ' }',
+        '@media (prefers-color-scheme: light) { .fb[data-theme="auto"] { ' + LIGHT_TOKENS + ' } }',
+        // "custom" uses the `colors` option (--_cfg-*), with the dark palette for anything it leaves out.
+        '.fb[data-theme="custom"] { --_t-bg: var(--_cfg-bg, #2b2b2d); --_t-fg: var(--_cfg-fg, #f2f2f4); --_t-accent: var(--_cfg-accent, var(--fb-accent-cfg, var(--_fg))); }',
+        // The page's --fb-bg / --fb-text / --fb-font, when set, win over the palette and `colors`.
+        // The accent falls back from the `accent` option (--fb-accent-cfg) to the text colour.
+        '.fb { --_t-accent: var(--fb-accent-cfg, var(--_fg)); }',
+        '.fb { --_bg: var(--fb-bg, var(--_t-bg)); --_fg: var(--fb-text, var(--_t-fg)); font-family: var(--fb-font, -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Arial, sans-serif); font-size: 14px; line-height: 1.45; color: var(--_fg); user-select: text; -webkit-user-select: text; }',
 
         // Launcher: a 44px tappable box (the recommended touch-target size) with a quieter 38px
-        // circle drawn inside it by ::before. The accent colour only appears on hover and focus.
-        '.fb-launcher { position: fixed; width: 44px; height: 44px; padding: 0; border: 0; background: transparent; color: rgba(255,255,255,.85); display: flex; align-items: center; justify-content: center; cursor: var(--fb-cursor, pointer); transition: color .2s ease; }',
-        '.fb-launcher::before { content: ""; position: absolute; width: 38px; height: 38px; border-radius: 50%; background: #2b2b2d; border: 1px solid rgba(255,255,255,.28); transition: border-color .2s ease; }',
+        // circle drawn inside it by ::before. The accent colour only appears on hover and focus,
+        // on the icon and the ring together.
+        '.fb-launcher { position: fixed; width: 44px; height: 44px; padding: 0; border: 0; background: transparent; color: ' + tint(85) + '; display: flex; align-items: center; justify-content: center; cursor: var(--fb-cursor, pointer); transition: color .2s ease; }',
+        '.fb-launcher::before { content: ""; position: absolute; width: 38px; height: 38px; border-radius: 50%; background: var(--_bg); border: 1px solid ' + tint(28) + '; transition: border-color .2s ease; }',
         '.fb-launcher svg { position: relative; width: 18px; height: 18px; }',
-        '.fb-launcher:hover { color: #fff; }',
-        '.fb-launcher:hover::before { border-color: var(--fb-accent, var(--fb-accent-cfg)); }',
+        '.fb-launcher:hover { color: ' + ACCENT + '; }',
+        '.fb-launcher:hover::before { border-color: ' + ACCENT + '; }',
         // Two-tone focus ring (white inside, dark outside) so it is visible on light and dark host pages.
-        '.fb-launcher:focus-visible { outline: none; color: #fff; }',
-        '.fb-launcher:focus-visible::before { border-color: var(--fb-accent, var(--fb-accent-cfg)); box-shadow: 0 0 0 2px #fff, 0 0 0 4px #1d1d1f; }',
-        '.fb-btn:focus-visible, .fb-chip:focus-visible, .fb-input:focus-visible, .fb-send:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }',
+        '.fb-launcher:focus-visible { outline: none; color: ' + ACCENT + '; }',
+        '.fb-launcher:focus-visible::before { border-color: ' + ACCENT + '; box-shadow: 0 0 0 2px #fff, 0 0 0 4px #1d1d1f; }',
+        '.fb-btn:focus-visible, .fb-chip:focus-visible, .fb-input:focus-visible, .fb-send:focus-visible { outline: 2px solid var(--_fg); outline-offset: 2px; }',
 
-        '.fb-panel { position: fixed; width: 320px; max-width: calc(100vw - 32px); display: flex; flex-direction: column; background: #2b2b2d; border: 1px solid rgba(255,255,255,.12); border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,.25); overflow: hidden; opacity: 0; transform: translateY(8px); pointer-events: none; visibility: hidden; transition: opacity .15s ease, transform .15s ease, visibility 0s linear .15s; }',
+        '.fb-panel { position: fixed; width: 320px; max-width: calc(100vw - 32px); display: flex; flex-direction: column; background: var(--_bg); border: 1px solid ' + tint(12) + '; border-radius: 12px; box-shadow: 0 8px 24px var(--_t-shadow); overflow: hidden; opacity: 0; transform: translateY(8px); pointer-events: none; visibility: hidden; transition: opacity .15s ease, transform .15s ease, visibility 0s linear .15s; }',
         '.fb-panel.is-open { opacity: 1; transform: none; pointer-events: auto; visibility: visible; transition-delay: 0s; }',
 
-        '.fb-header { display: flex; align-items: center; justify-content: space-between; padding: 8px 8px 8px 14px; border-bottom: 1px solid rgba(255,255,255,.08); }',
-        '.fb-title { margin: 0; font-size: 13px; font-weight: 600; color: rgba(255,255,255,.9); }',
-        '.fb-btn { border: 0; background: transparent; color: rgba(255,255,255,.7); width: 28px; height: 28px; border-radius: 6px; display: flex; align-items: center; justify-content: center; cursor: var(--fb-cursor, pointer); }',
-        '.fb-btn:hover { color: #fff; background: rgba(255,255,255,.1); }',
+        '.fb-header { display: flex; align-items: center; justify-content: space-between; padding: 8px 8px 8px 14px; border-bottom: 1px solid ' + tint(8) + '; }',
+        '.fb-title { margin: 0; font-size: 13px; font-weight: 600; color: ' + tint(90) + '; }',
+        '.fb-btn { border: 0; background: transparent; color: ' + tint(70) + '; width: 28px; height: 28px; border-radius: 6px; display: flex; align-items: center; justify-content: center; cursor: var(--fb-cursor, pointer); }',
+        '.fb-btn:hover { color: var(--_fg); background: ' + tint(10) + '; }',
         '.fb-btn svg { width: 16px; height: 16px; }',
 
-        '.fb-log { flex: 0 1 auto; min-height: 0; overflow-y: auto; padding: 14px; display: flex; flex-direction: column; gap: 8px; overscroll-behavior: contain; }',
+        // scrollbar-color keeps the scrollbar matching custom colours, which color-scheme can't know.
+        '.fb-log { flex: 0 1 auto; min-height: 0; overflow-y: auto; padding: 14px; display: flex; flex-direction: column; gap: 8px; overscroll-behavior: contain; scrollbar-color: ' + tint(30) + ' transparent; }',
         '.fb-msg { max-width: 88%; padding: 8px 12px; border-radius: 10px; white-space: pre-wrap; overflow-wrap: anywhere; }',
-        '.fb-msg--bot { align-self: flex-start; background: rgba(255,255,255,.08); }',
-        '.fb-msg--user { align-self: flex-end; background: rgba(255,255,255,.16); }',
+        '.fb-msg--bot { align-self: flex-start; background: ' + tint(8) + '; }',
+        '.fb-msg--user { align-self: flex-end; background: ' + tint(16) + '; }',
         '.fb-msg a { color: inherit; text-decoration: underline; text-underline-offset: 2px; cursor: var(--fb-cursor, pointer); }',
 
         '.fb-typing { display: inline-flex; gap: 4px; padding: 4px 0; }',
-        '.fb-typing i { width: 6px; height: 6px; border-radius: 50%; background: rgba(255,255,255,.6); animation: fb-blink 1s infinite ease-in-out; }',
+        '.fb-typing i { width: 6px; height: 6px; border-radius: 50%; background: ' + tint(60) + '; animation: fb-blink 1s infinite ease-in-out; }',
         '.fb-typing i:nth-child(2) { animation-delay: .15s; }',
         '.fb-typing i:nth-child(3) { animation-delay: .3s; }',
         '@keyframes fb-blink { 0%, 80%, 100% { opacity: .25; } 40% { opacity: 1; } }',
 
         // Suggestions are quiet text links rather than pills.
         '.fb-chips { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 0 14px 10px; }',
-        '.fb-chip { border: 0; background: transparent; padding: 3px 0; color: rgba(255,255,255,.72); font: inherit; font-size: 13px; text-align: left; text-decoration: underline; text-decoration-color: rgba(255,255,255,.3); text-underline-offset: 3px; cursor: var(--fb-cursor, pointer); transition: color .2s ease; }',
-        '.fb-chip:hover { color: #fff; text-decoration-color: #fff; }',
+        '.fb-chip { border: 0; background: transparent; padding: 3px 0; color: ' + tint(72) + '; font: inherit; font-size: 13px; text-align: left; text-decoration: underline; text-decoration-color: ' + tint(30) + '; text-underline-offset: 3px; cursor: var(--fb-cursor, pointer); transition: color .2s ease; }',
+        '.fb-chip:hover { color: var(--_fg); text-decoration-color: var(--_fg); }',
 
-        '.fb-form { display: flex; gap: 8px; padding: 10px 12px; border-top: 1px solid rgba(255,255,255,.08); }',
-        '.fb-input { flex: 1; min-width: 0; border: 1px solid rgba(255,255,255,.18); background: rgba(255,255,255,.05); color: #fff; font: inherit; padding: 8px 10px; border-radius: 8px; cursor: var(--fb-cursor, text); }',
-        '.fb-input::placeholder { color: rgba(255,255,255,.5); }',
+        '.fb-form { display: flex; gap: 8px; padding: 10px 12px; border-top: 1px solid ' + tint(8) + '; }',
+        '.fb-input { flex: 1; min-width: 0; border: 1px solid ' + tint(18) + '; background: ' + tint(5) + '; color: var(--_fg); font: inherit; padding: 8px 10px; border-radius: 8px; cursor: var(--fb-cursor, text); }',
+        '.fb-input::placeholder { color: ' + tint(50) + '; }',
         // iOS Safari zooms the page when a focused input has text smaller than 16px.
         '@media (pointer: coarse) { .fb-input { font-size: 16px; } }',
-        '.fb-send { border: 1px solid rgba(255,255,255,.25); background: transparent; color: rgba(255,255,255,.85); font: inherit; font-size: 13px; padding: 0 12px; border-radius: 8px; cursor: var(--fb-cursor, pointer); transition: border-color .2s ease, color .2s ease; }',
-        '.fb-send:hover:not([aria-disabled="true"]) { color: #fff; border-color: var(--fb-accent, var(--fb-accent-cfg)); }',
+        '.fb-send { border: 1px solid ' + tint(25) + '; background: transparent; color: ' + tint(85) + '; font: inherit; font-size: 13px; padding: 0 12px; border-radius: 8px; cursor: var(--fb-cursor, pointer); transition: border-color .2s ease, color .2s ease; }',
+        '.fb-send:hover:not([aria-disabled="true"]) { color: var(--_fg); border-color: ' + ACCENT + '; }',
         '.fb-send[aria-disabled="true"] { opacity: .5; }',
         // Text for screen readers only (the typing indicator).
         '.fb-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }',
@@ -169,6 +196,25 @@
             last = match.index + match[0].length;
         }
         if (last < text.length) container.appendChild(document.createTextNode(text.slice(last)));
+    }
+
+    // Applies the `colors` option ({ background, text, accent }) to `node` as --_cfg-*, the
+    // colours of the "custom" theme. A new set replaces the old one completely. Values the
+    // browser doesn't recognise as a colour are skipped, so a typo keeps the default colour
+    // instead of leaving the panel transparent.
+    var COLOR_VARS = { background: '--_cfg-bg', text: '--_cfg-fg', accent: '--_cfg-accent' };
+    function applyColors(node, colors) {
+        if (!colors || typeof colors !== 'object') return;
+        Object.keys(COLOR_VARS).forEach(function (key) {
+            node.style.removeProperty(COLOR_VARS[key]);
+            setColor(node, COLOR_VARS[key], colors[key]);
+        });
+    }
+
+    function setColor(node, name, value) {
+        if (typeof value !== 'string') return;
+        if (global.CSS && typeof global.CSS.supports === 'function' && !global.CSS.supports('color', value)) return;
+        node.style.setProperty(name, value);
     }
 
     function mergeConfig(user) {
@@ -247,7 +293,14 @@
 
         var wrap = el('div', 'fb');
         // The config value is only a fallback: a --fb-accent set by the host page's CSS wins.
-        wrap.style.setProperty('--fb-accent-cfg', cfg.accent);
+        setColor(wrap, '--fb-accent-cfg', cfg.accent);
+        // setTheme('custom', colors) can also swap the custom colours at runtime.
+        function setTheme(theme, colors) {
+            applyColors(wrap, colors);
+            wrap.setAttribute('data-theme', THEMES.indexOf(theme) !== -1 ? theme : 'auto');
+        }
+        var themeGiven = userConfig && userConfig.theme != null;
+        setTheme(!themeGiven && cfg.colors ? 'custom' : cfg.theme, cfg.colors);
 
         var launcher = el('button', 'fb-launcher', {
             type: 'button',
@@ -391,7 +444,8 @@
             launcher.setAttribute('aria-label', 'Close chat');
             if (!greeted) {
                 greeted = true;
-                addMessage('assistant', cfg.greeting);
+                // An empty or missing greeting means none: the panel opens on the suggestions.
+                if (typeof cfg.greeting === 'string' && cfg.greeting.trim() !== '') addMessage('assistant', cfg.greeting);
             }
             input.focus();
         }
@@ -414,7 +468,7 @@
         });
 
         document.body.appendChild(host);
-        state = { host: host, open: open, close: close };
+        state = { host: host, open: open, close: close, setTheme: setTheme };
     }
 
     function destroy() {
@@ -427,6 +481,7 @@
         init: init,
         open: function () { if (state) state.open(); },
         close: function () { if (state) state.close(); },
+        setTheme: function (theme, colors) { if (state) state.setTheme(theme, colors); },
         destroy: destroy
     };
 })(window);

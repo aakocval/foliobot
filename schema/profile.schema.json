@@ -58,11 +58,11 @@
       "additionalProperties": false,
       "properties": {
         "title": { "type": "string", "description": "Chat panel header. Defaults to \"Ask about <name>\"." },
-        "greeting": { "type": "string" },
+        "greeting": { "type": "string", "description": "First message the bot shows when the chat opens. Defaults to a short hello that names you; \"\" shows no greeting." },
         "suggestions": {
           "type": "array",
           "items": { "type": "string" },
-          "description": "Quick-question buttons. Each should be answerable: a topic question, a project, or an faq `q`."
+          "description": "Quick-question links shown under the greeting until the visitor sends a message (the first 3 by default). Each should be answerable: a topic question, a project, or an faq `q`."
         },
         "declineMessage": { "type": "string", "description": "Reply to questions outside the bot's scope." }
       }
