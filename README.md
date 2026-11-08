@@ -1,19 +1,25 @@
 # FolioBot
 
-An embeddable chat widget that answers questions about you, built from a single `profile.json`.
-Drop in a `<script>` tag, describe yourself once, and visitors to your portfolio can ask about your projects, tech stack, and how to reach you.
+An embeddable chat widget that answers questions about you from a single `profile.json`.
+Add two `<script>` tags, describe yourself once, and visitors to your portfolio can ask about your projects, tech stack, and how to reach you.
 
-> **Status: early.** The widget and a scripted (no-AI) answer engine work today. The AI backend is in progress; see the roadmap below.
+> **Status: early.** The widget and a scripted (no-AI) answer engine work today. An AI backend is planned; see [Roadmap](#roadmap).
 
 ![FolioBot widget open on the demo page](docs/screenshot.png)
 
-## What works today
+## Features
 
-- **Widget** ([`widget/`](widget)): one dependency-free file (`foliobot.js`), Shadow DOM so your site's CSS cannot break it, accessible (dialog role, live region, Esc to close, reduced-motion aware), and messages are rendered without `innerHTML`. Light, dark, auto (follows the visitor's system setting) and custom-colour themes.
-- **Profile engine** ([`widget/profile-engine.js`](widget/profile-engine.js)): turns a `profile.json` into scripted answers. No network, no cost, no API key.
-- **Schema** ([`schema/profile.schema.json`](schema/profile.schema.json)): the shape of `profile.json`, with editor autocomplete and validation. Start from [`examples/profile.example.json`](examples/profile.example.json).
+- **One dependency-free file.** No build step, no framework. Shadow DOM keeps your site's CSS out of the widget and the widget's CSS out of your site.
+- **Answers from your profile.** The profile engine turns `profile.json` into scripted answers in the browser: no server, no API key, no cost.
+- **Themes.** Light, dark, auto (follows the visitor's system setting) or your own colours.
+- **Accessible.** Dialog role, live region, Esc to close, focus returns to the launcher, respects reduced motion.
+- **Safe rendering.** Messages are rendered with `textContent`, never `innerHTML`, so it works on pages that enforce Trusted Types. A strict `style-src` is supported with a nonce ([CSP](widget/README.md#content-security-policy)).
+- **Pluggable answers.** Use the profile engine, your own `respond()` function, or an HTTP `endpoint`.
 
 ## Quick start
+
+1. Copy [`examples/profile.example.json`](examples/profile.example.json) to `profile.json` and fill it in. The [schema](schema/profile.schema.json) gives you autocomplete and validation in editors that support JSON Schema.
+2. Add the widget to your page:
 
 ```html
 <script src="widget/foliobot.js"></script>
@@ -25,11 +31,11 @@ Drop in a `<script>` tag, describe yourself once, and visitors to your portfolio
 </script>
 ```
 
-To load the files from a free CDN instead of copying them, see [Use it from a CDN](widget/README.md#use-it-from-a-cdn-free). Full options and the backend contract are in [`widget/README.md`](widget/README.md).
+The page must be served over HTTP, because browsers block `fetch` on `file://`. To load the scripts from jsDelivr instead of copying them, see [Use it from a CDN](widget/README.md#use-it-from-a-cdn-free).
 
-### Customize the opening message
+## Customize
 
-The header, the first message and the suggested questions come from the `bot` block of your `profile.json`:
+**Opening message.** The header, greeting and suggested questions come from the `bot` block of `profile.json`. Set `"greeting": ""` to open on the suggestions alone. Every suggestion needs an answer in your profile ([details](widget/README.md#customize-the-opening-message)).
 
 ```json
 "bot": {
@@ -39,67 +45,63 @@ The header, the first message and the suggested questions come from the `bot` bl
 }
 ```
 
-Set `"greeting": ""` to open on the suggestions alone. Each suggestion needs an answer in your profile; see [Customize the opening message](widget/README.md#customize-the-opening-message) for how to make sure it has one.
-
-### Match your site
-
-The widget follows the visitor's light/dark system setting by default. Pass a second argument to `fromProfile` to fix the theme or use your own colours:
+**Theme.** The default follows the visitor's light/dark setting. Pass overrides as the second argument to `fromProfile`:
 
 ```js
 FolioBot.init(FolioBot.fromProfile(profile, {
   theme: 'custom',                  // 'auto' (default), 'light', 'dark' or 'custom'
-  colors: {                         // used by 'custom'
-    background: '#0f172a',
-    text: '#e2e8f0',
-    accent: '#38bdf8'               // optional hover and focus colour
-  }
+  colors: { background: '#0f172a', text: '#e2e8f0', accent: '#38bdf8' }
 }));
 
-FolioBot.setTheme('light');         // switch later, e.g. from your site's own theme toggle
+FolioBot.setTheme('light');         // switch later, e.g. from your site's theme toggle
 ```
 
-Borders, bubbles and muted text are derived from `text`, so two colours are enough. Hover is neutral by default (it brightens to the theme's text colour); set `accent` for a brand colour in every theme. You can also theme it from your stylesheet with CSS variables. See [Theming](widget/README.md#theming).
+Borders, bubbles and muted text are derived from `text`, so two colours are enough; `accent` is optional. You can also theme it with CSS variables ([Theming](widget/README.md#theming)).
 
-## Try it
+**Your own answers.** Skip the profile engine and pass `respond: function (text, history) { ... }`, or point `endpoint` at a server that accepts `POST { messages }` and returns `{ reply }` ([endpoint contract](widget/README.md#the-endpoint-contract)).
 
-Serve the repo over HTTP (the demo loads its profile with `fetch`, which browsers block on `file://`):
+All options and methods are in [`widget/README.md`](widget/README.md#config).
+
+## Development
 
 ```bash
 python3 -m http.server
 ```
 
-Then open <http://localhost:8000/examples/demo.html>. Edit `examples/profile.example.json` and reload to change the answers. The theme menu on the page switches the widget between auto, light, dark and a custom example.
-
-## Tests
-
-The answer engine and the widget's config logic (themes, colours, greeting) have a dependency-free test suite using Node's built-in runner (Node 18 or newer):
+Open <http://localhost:8000/examples/demo.html> (add `#open` to start with the chat open). Edit `examples/profile.example.json` and reload to change the answers; the menu on the page switches themes.
 
 ```bash
 node --test tests/*.test.js
 ```
 
-The widget tests run against a small fake DOM, so they check what the widget sets, not how it looks. Check visual changes in the demo page.
+Tests use Node's built-in runner (Node 18+), with no dependencies. They cover the answer engine and the widget's config logic against a small fake DOM, so check visual changes in the demo page.
+
+| Path | What it is |
+| --- | --- |
+| [`widget/`](widget) | The widget (`foliobot.js`) and the profile engine (`profile-engine.js`) |
+| [`schema/`](schema) | JSON Schema for `profile.json` |
+| [`examples/`](examples) | Example profile and demo page |
+| [`tests/`](tests) | Engine and widget tests |
+| [`docs/`](docs) | Security notes and threat model |
 
 ## Roadmap
 
-| Area | Plan |
-| --- | --- |
-| `server/` | Python (FastAPI + Pydantic) backend that answers from the profile using an LLM |
-| Retrieval | Embed the profile and retrieve only the relevant parts per question |
-| Tool calling | Let the model fetch structured facts (links, stacks) instead of guessing |
-| `evals/` | A test suite of in-scope, out-of-scope, and prompt-injection questions, with pass rates tracked per version |
-| Ingest | A CLI that builds a `profile.json` from a resume, Markdown, or URL, for you to review before use |
-| Packaging | CDN / npm release for the widget |
+Nothing below is built yet.
 
-The step-by-step learning log is in [`docs/LEARNING.md`](docs/LEARNING.md).
+- **Backend** (`server/`): a Python (FastAPI + Pydantic) service that answers from the profile with an LLM, behind the existing endpoint contract
+- **Retrieval:** embed the profile and send only the relevant parts with each question
+- **Tool calling:** let the model look up exact facts such as links and stacks instead of guessing
+- **Evals** (`evals/`): in-scope, out-of-scope and prompt-injection questions, with pass rates tracked per version
+- **Ingest:** a CLI that drafts a `profile.json` from a resume, Markdown or a URL, for you to review
+- **Packaging:** an npm release of the widget
 
-## Security notes
+## Security
 
-- Everything in `profile.json` ends up in a public widget or prompt. Do not put a phone number, salary, or home address in it.
+- Everything in `profile.json` ends up in a public widget or prompt. Don't put a phone number, salary or home address in it.
 - API keys belong in a server environment variable, never in the widget or this repo.
-- Any public chat endpoint needs rate limiting, input and output caps, and a spending cap. An `Origin` check helps against casual misuse but is not a security boundary.
+- A public chat endpoint needs rate limiting, input and output caps, and a spending cap. An `Origin` check helps against casual misuse but is not a security boundary.
 
-The full threat model, and what is implemented versus still required, is in [`docs/SECURITY.md`](docs/SECURITY.md).
+The full threat model, including what is implemented and what is still required, is in [`docs/SECURITY.md`](docs/SECURITY.md).
 
 ## License
 
