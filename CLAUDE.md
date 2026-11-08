@@ -15,7 +15,8 @@ widget/foliobot.js         the widget (UI only): window.FolioBot.init/open/close
 widget/profile-engine.js   scripted answers from a profile: FolioBot.fromProfile(profile, overrides)
 widget/README.md           embed usage, config table, and the endpoint contract
 schema/profile.schema.json JSON Schema (draft-07) for profile.json
-examples/                  profile.example.json: a generic example; must always validate against the schema
+examples/                  profile.example.json (a generic example; must always validate against the schema) and demo.html
+tests/                     node:test suite for the answer engine
 docs/LEARNING.md           the owner's roadmap (v1 scripted -> v2 FastAPI -> streaming -> RAG -> tools -> evals)
 server/                    Python backend (FastAPI + Pydantic), to be written by the owner
 evals/                     test questions and runner, to be written by the owner
@@ -52,7 +53,9 @@ There is no build. To try the widget, serve the repo over HTTP (the engine loads
 python3 -m http.server
 ```
 
-Use a small HTML page that loads `widget/foliobot.js`, `widget/profile-engine.js`, and `examples/profile.example.json`. There is no automated test suite yet; testing the widget means opening it in a browser and checking the console.
+Open `http://localhost:8000/examples/demo.html` (add `#open` to start with the chat open). There are no automated tests for the widget UI; check it in a browser and look at the console.
+
+Tests: `node --test tests/*.test.js` (Node's built-in runner, no dependencies; note the glob, since passing the folder alone fails on Node 25). They cover `widget/profile-engine.js`, including a check that every suggestion in `examples/profile.example.json` is answerable. When you change the engine or add a profile field, add or update a test.
 
 Syntax check: `node --check widget/foliobot.js && node --check widget/profile-engine.js`.
 

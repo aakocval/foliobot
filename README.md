@@ -5,6 +5,8 @@ Drop in a `<script>` tag, describe yourself once, and visitors to your portfolio
 
 > **Status: early.** The widget and a scripted (no-AI) answer engine work today. The AI backend is in progress; see the roadmap below.
 
+![FolioBot widget open on the demo page](docs/screenshot.png)
+
 ## What works today
 
 - **Widget** ([`widget/`](widget)): one dependency-free file, Shadow DOM so your site's CSS cannot break it, accessible (dialog role, live region, Esc to close, reduced-motion aware), and messages are rendered without `innerHTML`.
@@ -24,6 +26,26 @@ Drop in a `<script>` tag, describe yourself once, and visitors to your portfolio
 ```
 
 Full options and the backend contract are in [`widget/README.md`](widget/README.md).
+
+## Try it
+
+Serve the repo over HTTP (the demo loads its profile with `fetch`, which browsers block on `file://`):
+
+```bash
+python3 -m http.server
+```
+
+Then open <http://localhost:8000/examples/demo.html>. Edit `examples/profile.example.json` and reload to change the answers.
+
+## Tests
+
+The answer engine has a dependency-free test suite using Node's built-in runner (Node 18 or newer):
+
+```bash
+node --test tests/*.test.js
+```
+
+There are no automated tests for the widget UI yet.
 
 ## Roadmap
 
@@ -45,3 +67,7 @@ The step-by-step learning log is in [`docs/LEARNING.md`](docs/LEARNING.md).
 - Any public chat endpoint needs rate limiting, input and output caps, and a spending cap. An `Origin` check helps against casual misuse but is not a security boundary.
 
 The full threat model, and what is implemented versus still required, is in [`docs/SECURITY.md`](docs/SECURITY.md).
+
+## License
+
+[MIT](LICENSE)

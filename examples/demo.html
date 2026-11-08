@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>FolioBot demo</title>
+    <style>
+        :root { color-scheme: light dark; }
+        body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif; line-height: 1.55; color: #1d1d1f; background: #fff; }
+        main { max-width: 640px; margin: 0 auto; padding: 72px 24px; }
+        h1 { font-size: 2rem; margin: 0 0 8px; }
+        p { color: #4a4a4f; }
+        code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .9em; background: #f0f0f2; padding: 2px 6px; border-radius: 4px; }
+        .note { margin-top: 24px; padding: 12px 16px; border-left: 3px solid #b81828; background: #faf0f1; display: none; }
+        @media (prefers-color-scheme: dark) {
+            body { color: #f2f2f4; background: #1d1d1f; }
+            p { color: #b4b4ba; }
+            code { background: #2b2b2d; }
+            .note { background: #2b1a1d; }
+        }
+    </style>
+</head>
+<body>
+    <main>
+        <h1>FolioBot demo</h1>
+        <p>This page loads the widget and the answer engine, then feeds them <code>profile.example.json</code>. Open the chat button in the corner and ask about the example person's projects, tech stack, or contact details.</p>
+        <p>Edit <code>examples/profile.example.json</code> and reload to see the answers change.</p>
+        <p class="note" id="file-note">This page loads its profile with <code>fetch</code>, which browsers block on <code>file://</code>. Serve the repository over HTTP instead: run <code>python3 -m http.server</code> in the repo folder and open <code>http://localhost:8000/examples/demo.html</code>.</p>
+    </main>
+
+    <script src="../widget/foliobot.js"></script>
+    <script src="../widget/profile-engine.js"></script>
+    <script>
+        if (location.protocol === 'file:') {
+            document.getElementById('file-note').style.display = 'block';
+        } else {
+            fetch('profile.example.json')
+                .then(function (res) { return res.json(); })
+                .then(function (profile) {
+                    FolioBot.init(FolioBot.fromProfile(profile));
+                    // Add #open to the URL to start with the chat open (handy for screenshots).
+                    if (location.hash === '#open') FolioBot.open();
+                })
+                .catch(function (err) { console.warn('Could not load profile.example.json:', err); });
+        }
+    </script>
+</body>
+</html>
