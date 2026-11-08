@@ -64,6 +64,7 @@ Schema validation is manual for now (VS Code flags errors when a profile has `"$
 ## Git
 
 - Commit as `Val Moratalla <aakocval@gmail.com>`, with **no** `Co-Authored-By` line.
+- No Claude or AI attribution anywhere: no "Generated with Claude Code" footer in PR descriptions, no AI credit in commit messages, code comments, file headers, or copyright notices. The copyright holder is Val Moratalla.
 - Pushing with `git push` can fail on saved credentials, and the active `gh` account may be a work account. Push with the `aakocval` token:
   `GH_TOKEN=$(gh auth token --user aakocval) git -c credential.helper= -c credential.helper='!gh auth git-credential' push`
 - Never commit API keys or `.env` files. Commit a `.env.example` with empty values instead. Don't ignore `uv.lock` or other lockfiles; commit them.
