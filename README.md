@@ -1,4 +1,4 @@
-# foliobot
+# FolioBot
 
 An embeddable chat widget that answers questions about you, built from a single `profile.json`.
 Drop in a `<script>` tag, describe yourself once, and visitors to your portfolio can ask about your projects, tech stack, and how to reach you.
@@ -9,7 +9,7 @@ Drop in a `<script>` tag, describe yourself once, and visitors to your portfolio
 
 ## What works today
 
-- **Widget** ([`widget/`](widget)): one dependency-free file, Shadow DOM so your site's CSS cannot break it, accessible (dialog role, live region, Esc to close, reduced-motion aware), and messages are rendered without `innerHTML`.
+- **Widget** ([`widget/`](widget)): one dependency-free file (`foliobot.js`), Shadow DOM so your site's CSS cannot break it, accessible (dialog role, live region, Esc to close, reduced-motion aware), and messages are rendered without `innerHTML`.
 - **Profile engine** ([`widget/profile-engine.js`](widget/profile-engine.js)): turns a `profile.json` into scripted answers. No network, no cost, no API key.
 - **Schema** ([`schema/profile.schema.json`](schema/profile.schema.json)): the shape of `profile.json`, with editor autocomplete and validation. Start from [`examples/profile.example.json`](examples/profile.example.json).
 
@@ -25,7 +25,7 @@ Drop in a `<script>` tag, describe yourself once, and visitors to your portfolio
 </script>
 ```
 
-Full options and the backend contract are in [`widget/README.md`](widget/README.md).
+To load the files from a free CDN instead of copying them, see [Use it from a CDN](widget/README.md#use-it-from-a-cdn-free). Full options and the backend contract are in [`widget/README.md`](widget/README.md).
 
 ## Try it
 

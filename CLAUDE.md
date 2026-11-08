@@ -33,7 +33,7 @@ evals/                     test questions and runner, to be written by the owner
 
 - **Dependency-free, no build step, one file per concern.** Classic scripts in ES5 style (`var`, `function`), matching the owner's portfolio. Don't add a bundler or runtime dependency without discussing it.
 - **Shadow DOM** (open mode). All CSS lives inside the shadow root, with class names prefixed `fb-`. The only things crossing the boundary are CSS custom properties, which are the theming API: `--fb-accent`, `--fb-cursor`. Keep `cursor: var(--fb-cursor, ...)` on clickable elements, because host pages use it to hide the native cursor.
-- **Never use `innerHTML` with message text.** Visitor and bot text is rendered with `textContent` and created `<a>` nodes (`renderText`). Static icon SVGs are the only `innerHTML`.
+- **Never use `innerHTML` with message text.** Visitor and bot text is rendered with `textContent` and created `<a>` nodes (`renderText`). The widget has no `innerHTML` at all (icons use `setIcon`/`createElementNS`), which keeps it working under Trusted Types; keep it that way. Keep every regex quantifier that comes before a fixed character bounded (see `renderText`), so bot text can't trigger quadratic backtracking.
 - Conversation state lives in memory only. No cookies, no localStorage.
 - Accessibility is part of the contract: dialog role, `role="log"` + `aria-live`, Esc closes, focus returns to the launcher, `prefers-reduced-motion` respected.
 - The widget never knows where answers come from. Two transports: `respond(text, history)` or `endpoint` (see the contract in `widget/README.md`). If both are set, `respond` wins. Don't couple the widget to a specific backend or LLM provider.

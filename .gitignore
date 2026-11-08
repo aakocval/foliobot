@@ -3,6 +3,9 @@
 .idea/
 .vscode/
 
+# Claude Code personal settings (can hold allowlisted commands). Shared files like launch.json stay committable.
+.claude/settings.local.json
+
 # Secrets: never commit keys. Commit a .env.example with empty values instead.
 .env
 .env.*

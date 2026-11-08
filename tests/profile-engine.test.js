@@ -158,3 +158,45 @@ test('every suggestion in the example profile is answerable (none hits the decli
         assert.notEqual(answer(suggestion), decline, suggestion);
     }
 });
+
+test('a greeting followed by a real question gets the real answer', () => {
+    assert.match(respond('Hi, what apps have you built?'), /^Apps: /);
+    assert.match(respond('Hey, can I hire you?'), /Email: sam@example\.com/);
+    assert.match(respond('hello, who are you?'), /Software Engineer/);
+});
+
+test('"where do you work" is about the person, not the project list', () => {
+    assert.match(respond('where do you work?'), /Software Engineer/);
+    assert.match(respond('what work have you shipped?'), /^Apps: /);
+});
+
+test('"talk" alone does not trigger the contact answer', () => {
+    assert.doesNotMatch(respond('what do we talk about'), /Email:/);
+    assert.match(respond('can I talk to Sam?'), /Email: sam@example\.com/);
+});
+
+test('one- and two-letter skills only match when typed as in the profile', () => {
+    const lang = fromProfile({ name: 'Sam', skills: { summary: 'Systems languages.', items: ['C++', 'C#', 'Go', 'R'] } }).respond;
+    const other = "I can only answer questions about Sam's work, tech stack, and how to get in touch. Try one of the suggested questions, or ask about a project by name.";
+    assert.equal(lang('do you know C++?'), 'Systems languages.');
+    assert.equal(lang('any C# experience'), 'Systems languages.');
+    assert.equal(lang('do you use Go?'), 'Systems languages.');
+    assert.equal(lang('where did you go to school'), other);
+    assert.equal(lang('what is the c word for dinner'), other);
+});
+
+test('a malformed profile is ignored instead of throwing', () => {
+    const bad = fromProfile({
+        name: 'Sam',
+        projects: [{ description: 'no name' }, null, 'x'],
+        faqs: [{ a: 'no question' }, { q: 'ok?' }],
+        skills: { items: 'TypeScript', summary: 42 },
+        contact: { links: 'nope' },
+        bot: { suggestions: 'not an array' }
+    });
+    assert.deepEqual(bad.suggestions, []);
+    for (const q of ['undefined', 'contact', 'stack', 'projects', 'ok?', 'who are you']) {
+        assert.equal(typeof bad.respond(q), 'string', q);
+    }
+    assert.equal(bad.respond('undefined'), "I can only answer questions about Sam's work, tech stack, and how to get in touch. Try one of the suggested questions, or ask about a project by name.");
+});

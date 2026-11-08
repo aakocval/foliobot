@@ -23,12 +23,15 @@ Trust boundaries: the **host page** (embeds the widget), the **visitor** (untrus
 
 | Threat | Mitigation |
 | --- | --- |
-| XSS through chat text | Message text is rendered with `textContent` and created `<a>` nodes, never `innerHTML`. Only static icon SVGs use `innerHTML`. |
+| XSS through chat text | Message text is rendered with `textContent` and created `<a>` nodes. The widget uses no `innerHTML` at all (icons are built with `createElementNS`), so it also runs under Trusted Types. |
+| Host pages forced to weaken their CSP | CSS is a single `<style>` element that accepts a nonce (`styleNonce`), so a page does not need `style-src 'unsafe-inline'`. |
 | Host page styles or scripts interfering | Shadow DOM isolates styles. (It does not isolate JavaScript: the host page can always reach the widget's open shadow root.) |
 | Visitor data persisting | Conversation state lives in memory only. No cookies, no `localStorage`. |
 | Oversized input | `maxLength` (default 200 characters) on the input and on what is sent. |
 | Tampered widget on a consumer site | Consumers should load the widget pinned to an exact commit with `integrity` (SRI) hashes. The author's portfolio does this. |
-| Link hijacking from bot text | Generated links use `rel="noopener noreferrer"` and only `http(s)` URLs or `mailto:` are created. |
+| Link hijacking from bot text | Generated links use `rel="noopener noreferrer"` and only `http(s)` URLs or `mailto:` are created. The schema rejects `javascript:` and `data:` URLs in profile links. An optional `allowLink(href)` hook lets the host keep unapproved links as plain text. It is off by default. |
+| A hostile or broken backend freezing the page | Replies are cut to `maxReplyLength` (default 2,000 characters), and the link-detection regex is bounded so it runs in linear time. Before this fix, a 40,000-character reply took about 1 s to render, and the time grew with the square of the length. |
+| Runaway or oversized requests from the widget | Calls to `endpoint` time out (`endpointTimeout`, default 20 s) and send at most `maxHistory` messages (default 20). Client-side only: a script can ignore both, so the server still needs its own limits (see below). |
 
 Known limits: the scripted engine can reveal anything in `profile.json`, by design. Do not put private data in it.
 
@@ -46,6 +49,7 @@ Known limits: the scripted engine can reveal anything in `profile.json`, by desi
 
 Text from a resume, a web page, or a visitor can contain instructions ("ignore previous instructions..."). It cannot be fully prevented, so limit the damage:
 
+- **The conversation history in each request is client-supplied.** A script can send made-up `assistant` turns to prime a jailbreak, or a `system` role. Validate roles (`user` and `assistant` only), cap message count and length on the server, and never place client messages in the system prompt.
 - Wrap retrieved text in clear delimiters and label it as untrusted data in the prompt.
 - Keep secrets out of prompts entirely.
 - Give the model **read-only tools only**. Nothing reachable from retrieved text may cause a side effect.

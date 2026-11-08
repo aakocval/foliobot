@@ -76,7 +76,7 @@
       "required": ["label", "url"],
       "properties": {
         "label": { "type": "string", "minLength": 1 },
-        "url": { "type": "string", "format": "uri" }
+        "url": { "type": "string", "format": "uri", "pattern": "^https?://", "description": "Must start with http:// or https://. Other schemes (javascript:, data:) are rejected." }
       }
     },
     "project": {
@@ -97,7 +97,7 @@
           "items": { "type": "string" },
           "description": "Free-form facts, e.g. \"1M+ downloads\", \"★ 4.6 (779 ratings)\"."
         },
-        "link": { "type": "string", "format": "uri" }
+        "link": { "type": "string", "format": "uri", "pattern": "^https?://", "description": "Must start with http:// or https://." }
       }
     },
     "faq": {

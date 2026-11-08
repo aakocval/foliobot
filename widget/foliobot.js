@@ -17,7 +17,7 @@
  * that is the part you swap out as you learn:
  *
  *   1. respond(text, history)  - a function returning a string or a Promise<string>.
- *                                v1 uses this with scripted answers (see js/chat-init.js).
+ *                                v1 uses this with scripted answers (see profile-engine.js).
  *   2. endpoint                - a URL. The widget POSTs { messages: [{role, content}] }
  *                                and expects { reply: "..." } back. This is where your
  *                                own backend (e.g. a Cloudflare Worker calling an LLM) plugs in.
@@ -37,11 +37,17 @@
         maxHeight: 400,               // px cap for the open panel; it grows with the chat up to this, then scrolls
         placeholder: 'Type your question...',
         launcherLabel: 'Open chat',
-        accent: '#b81828',            // hover and focus highlights only; the widget is otherwise neutral
+        accent: '#b81828',            // hover and focus highlights only; the widget is otherwise neutral. A --fb-accent CSS variable on the page overrides it.
+        zIndex: 200,                  // stacking order of the widget; raise it if your page has higher layers
         position: { right: 24, bottom: 24 }, // px offsets of the launcher from the viewport corner
         maxLength: 200,               // max characters a visitor can send per message
         typingDelay: 450,             // ms of fake "typing" for instant answers, so replies feel natural
+        endpointTimeout: 20000,       // ms to wait for `endpoint` before giving up and showing errorMessage
+        maxHistory: 20,               // most recent messages sent to `endpoint` (older ones are dropped)
+        maxReplyLength: 2000,         // characters of a reply that are shown; the rest is cut off
         errorMessage: 'Sorry, something went wrong. Please try again in a moment.',
+        styleNonce: null,             // CSP nonce for the widget's <style> element, for pages without style-src 'unsafe-inline'
+        allowLink: null,              // function (href) -> false to show that link as plain text instead
         respond: null,
         endpoint: null
     };
@@ -60,10 +66,10 @@
         '.fb-launcher::before { content: ""; position: absolute; width: 38px; height: 38px; border-radius: 50%; background: #2b2b2d; border: 1px solid rgba(255,255,255,.28); transition: border-color .2s ease; }',
         '.fb-launcher svg { position: relative; width: 18px; height: 18px; }',
         '.fb-launcher:hover { color: #fff; }',
-        '.fb-launcher:hover::before { border-color: var(--fb-accent); }',
+        '.fb-launcher:hover::before { border-color: var(--fb-accent, var(--fb-accent-cfg)); }',
         // Two-tone focus ring (white inside, dark outside) so it is visible on light and dark host pages.
         '.fb-launcher:focus-visible { outline: none; color: #fff; }',
-        '.fb-launcher:focus-visible::before { border-color: var(--fb-accent); box-shadow: 0 0 0 2px #fff, 0 0 0 4px #1d1d1f; }',
+        '.fb-launcher:focus-visible::before { border-color: var(--fb-accent, var(--fb-accent-cfg)); box-shadow: 0 0 0 2px #fff, 0 0 0 4px #1d1d1f; }',
         '.fb-btn:focus-visible, .fb-chip:focus-visible, .fb-input:focus-visible, .fb-send:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }',
 
         '.fb-panel { position: fixed; width: 320px; max-width: calc(100vw - 32px); display: flex; flex-direction: column; background: #2b2b2d; border: 1px solid rgba(255,255,255,.12); border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,.25); overflow: hidden; opacity: 0; transform: translateY(8px); pointer-events: none; visibility: hidden; transition: opacity .15s ease, transform .15s ease, visibility 0s linear .15s; }',
@@ -95,15 +101,21 @@
         '.fb-form { display: flex; gap: 8px; padding: 10px 12px; border-top: 1px solid rgba(255,255,255,.08); }',
         '.fb-input { flex: 1; min-width: 0; border: 1px solid rgba(255,255,255,.18); background: rgba(255,255,255,.05); color: #fff; font: inherit; padding: 8px 10px; border-radius: 8px; cursor: var(--fb-cursor, text); }',
         '.fb-input::placeholder { color: rgba(255,255,255,.5); }',
+        // iOS Safari zooms the page when a focused input has text smaller than 16px.
+        '@media (pointer: coarse) { .fb-input { font-size: 16px; } }',
         '.fb-send { border: 1px solid rgba(255,255,255,.25); background: transparent; color: rgba(255,255,255,.85); font: inherit; font-size: 13px; padding: 0 12px; border-radius: 8px; cursor: var(--fb-cursor, pointer); transition: border-color .2s ease, color .2s ease; }',
-        '.fb-send:hover:not(:disabled) { color: #fff; border-color: var(--fb-accent); }',
-        '.fb-send:disabled { opacity: .5; }',
+        '.fb-send:hover:not([aria-disabled="true"]) { color: #fff; border-color: var(--fb-accent, var(--fb-accent-cfg)); }',
+        '.fb-send[aria-disabled="true"] { opacity: .5; }',
+        // Text for screen readers only (the typing indicator).
+        '.fb-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }',
 
         '@media (prefers-reduced-motion: reduce) { .fb-launcher, .fb-launcher::before, .fb-panel, .fb-chip, .fb-send { transition: none; } .fb-typing i { animation: none; opacity: .6; } }'
     ].join('\n');
 
-    var ICON_CHAT = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg>';
-    var ICON_CLOSE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>';
+    // Icon path data. The SVGs are built with DOM calls, not innerHTML, so the widget also
+    // works on pages that enforce Trusted Types.
+    var ICON_CHAT = ['M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z'];
+    var ICON_CLOSE = ['M6 6l12 12M18 6L6 18'];
 
     var state = null; // set by init(), cleared by destroy()
 
@@ -114,17 +126,43 @@
         return node;
     }
 
+    // Replaces the content of `node` with an icon drawn from `paths`.
+    function setIcon(node, paths) {
+        var NS = 'http://www.w3.org/2000/svg';
+        var svg = document.createElementNS(NS, 'svg');
+        var attrs = { viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', 'stroke-width': '1.75',
+            'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'aria-hidden': 'true' };
+        Object.keys(attrs).forEach(function (k) { svg.setAttribute(k, attrs[k]); });
+        paths.forEach(function (d) {
+            var path = document.createElementNS(NS, 'path');
+            path.setAttribute('d', d);
+            svg.appendChild(path);
+        });
+        while (node.firstChild) node.removeChild(node.firstChild);
+        node.appendChild(svg);
+    }
+
+    // Asks the host's allowLink(href) whether a link may be clickable. A throwing hook counts as "no".
+    function linkAllowed(allowLink, href) {
+        if (typeof allowLink !== 'function') return true;
+        try { return allowLink(href) !== false; } catch (e) { return false; }
+    }
+
     // Turns plain text into DOM nodes, making URLs and emails clickable.
     // We build nodes instead of using innerHTML, so message text can never inject markup.
-    function renderText(container, text) {
-        var pattern = /(https?:\/\/[^\s]*[^\s.,;:!?)]|[\w.+-]+@[\w-]+\.[\w.-]*\w)/g;
+    // Every quantifier before a fixed character is bounded, so a long run of letters with no
+    // "@" stays linear instead of backtracking quadratically (and freezing the page).
+    function renderText(container, text, allowLink) {
+        var pattern = /(https?:\/\/[^\s]*[^\s.,;:!?)]|[\w.+-]{1,64}@[\w-]{1,63}\.[\w.-]{0,190}\w)/g;
         var last = 0;
         var match;
         while ((match = pattern.exec(text)) !== null) {
-            if (match.index > last) container.appendChild(document.createTextNode(text.slice(last, match.index)));
             var isEmail = match[0].indexOf('://') === -1;
+            var href = isEmail ? 'mailto:' + match[0] : match[0];
+            if (!linkAllowed(allowLink, href)) continue; // left in the text, rendered as plain text below
+            if (match.index > last) container.appendChild(document.createTextNode(text.slice(last, match.index)));
             var a = el('a');
-            a.href = isEmail ? 'mailto:' + match[0] : match[0];
+            a.href = href;
             if (!isEmail) { a.target = '_blank'; a.rel = 'noopener noreferrer'; }
             a.textContent = match[0];
             container.appendChild(a);
@@ -144,16 +182,38 @@
         return cfg;
     }
 
-    // Asks the configured source for a reply. Always returns a Promise<string>.
+    // The most recent `max` messages, starting on a user turn (many chat APIs reject a
+    // conversation that opens with the assistant). Keeps the request size bounded.
+    function trimHistory(history, max) {
+        var recent = history.slice(-Math.max(1, max));
+        while (recent.length && recent[0].role !== 'user') recent.shift();
+        return recent;
+    }
+
+    // Asks the configured source for a reply. Always returns a Promise<string>, and a
+    // synchronous throw (from respond() or fetch) becomes a rejection instead of escaping.
     function getReply(cfg, text, history) {
-        if (typeof cfg.respond === 'function') {
-            return Promise.resolve(cfg.respond(text, history.slice()));
-        }
-        if (cfg.endpoint) {
-            return fetch(cfg.endpoint, {
+        return new Promise(function (resolve) {
+            if (typeof cfg.respond === 'function') {
+                resolve(cfg.respond(text, history.slice()));
+                return;
+            }
+            if (!cfg.endpoint) throw new Error('No respond() or endpoint configured');
+
+            // A hung backend must not leave the chat stuck on "typing" forever.
+            var controller = typeof AbortController === 'function' ? new AbortController() : null;
+            var timer;
+            var timeout = new Promise(function (resolveTimeout, reject) {
+                timer = setTimeout(function () {
+                    if (controller) controller.abort();
+                    reject(new Error('Timed out'));
+                }, cfg.endpointTimeout);
+            });
+            var request = fetch(cfg.endpoint, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ messages: history })
+                body: JSON.stringify({ messages: trimHistory(history, cfg.maxHistory) }),
+                signal: controller ? controller.signal : undefined
             }).then(function (res) {
                 if (!res.ok) throw new Error('HTTP ' + res.status);
                 return res.json();
@@ -161,8 +221,14 @@
                 if (!data || typeof data.reply !== 'string') throw new Error('Bad response shape');
                 return data.reply;
             });
-        }
-        return Promise.reject(new Error('No respond() or endpoint configured'));
+            resolve(Promise.race([request, timeout]).then(function (reply) {
+                clearTimeout(timer);
+                return reply;
+            }, function (err) {
+                clearTimeout(timer);
+                throw err;
+            }));
+        });
     }
 
     function init(userConfig) {
@@ -170,15 +236,18 @@
         var cfg = mergeConfig(userConfig);
 
         var host = el('div', null, { id: 'foliobot' });
-        host.style.cssText = 'position:fixed;z-index:200;left:0;top:0;width:0;height:0;';
+        var zIndex = isFinite(Number(cfg.zIndex)) ? Number(cfg.zIndex) : DEFAULTS.zIndex;
+        host.style.cssText = 'position:fixed;z-index:' + zIndex + ';left:0;top:0;width:0;height:0;';
         var root = host.attachShadow({ mode: 'open' });
 
         var style = el('style');
+        if (cfg.styleNonce) style.setAttribute('nonce', cfg.styleNonce);
         style.textContent = STYLES;
         root.appendChild(style);
 
         var wrap = el('div', 'fb');
-        wrap.style.setProperty('--fb-accent', cfg.accent);
+        // The config value is only a fallback: a --fb-accent set by the host page's CSS wins.
+        wrap.style.setProperty('--fb-accent-cfg', cfg.accent);
 
         var launcher = el('button', 'fb-launcher', {
             type: 'button',
@@ -186,7 +255,7 @@
             'aria-expanded': 'false',
             'aria-controls': 'fb-panel'
         });
-        launcher.innerHTML = ICON_CHAT;
+        setIcon(launcher, ICON_CHAT);
         launcher.style.right = cfg.position.right + 'px';
         launcher.style.bottom = cfg.position.bottom + 'px';
         // Position the panel just above the launcher, sharing its right edge.
@@ -202,7 +271,7 @@
         var title = el('h2', 'fb-title');
         title.textContent = cfg.title;
         var closeBtn = el('button', 'fb-btn', { type: 'button', 'aria-label': 'Close chat' });
-        closeBtn.innerHTML = ICON_CLOSE;
+        setIcon(closeBtn, ICON_CLOSE);
         header.appendChild(title);
         header.appendChild(closeBtn);
 
@@ -237,7 +306,7 @@
 
         function addMessage(role, text) {
             var bubble = el('div', 'fb-msg fb-msg--' + (role === 'user' ? 'user' : 'bot'));
-            renderText(bubble, text);
+            renderText(bubble, text, cfg.allowLink);
             log.appendChild(bubble);
             log.scrollTop = log.scrollHeight;
             return bubble;
@@ -245,9 +314,13 @@
 
         function showTyping() {
             var bubble = el('div', 'fb-msg fb-msg--bot');
-            var dots = el('span', 'fb-typing', { 'aria-label': 'Typing' });
-            dots.innerHTML = '<i></i><i></i><i></i>';
+            // The animated dots are decoration; screen readers get the text instead.
+            var dots = el('span', 'fb-typing', { 'aria-hidden': 'true' });
+            for (var d = 0; d < 3; d++) dots.appendChild(el('i'));
+            var label = el('span', 'fb-sr');
+            label.textContent = 'Typing';
             bubble.appendChild(dots);
+            bubble.appendChild(label);
             log.appendChild(bubble);
             log.scrollTop = log.scrollHeight;
             return bubble;
@@ -255,9 +328,12 @@
 
         function setPending(value) {
             pending = value;
-            send.disabled = value;
-            input.disabled = value;
-            if (!value) input.focus();
+            // Not `disabled`: a disabled control drops keyboard and screen-reader focus (and Esc
+            // stops reaching the widget). ask() ignores submits while pending anyway.
+            send.setAttribute('aria-disabled', value ? 'true' : 'false');
+            input.readOnly = value;
+            input.setAttribute('aria-busy', value ? 'true' : 'false');
+            if (!value && isOpen()) input.focus();
         }
 
         function ask(rawText) {
@@ -265,23 +341,36 @@
             if (!text || pending) return;
             chips.style.display = 'none'; // suggestions are only for the first question
             addMessage('user', text);
-            history.push({ role: 'user', content: text });
+            var userTurn = { role: 'user', content: text };
+            history.push(userTurn);
             input.value = '';
             setPending(true);
 
             var typing = showTyping();
             var started = Date.now();
+            var failed = false;
             getReply(cfg, text, history).then(function (reply) {
+                if (typeof reply !== 'string' || reply === '') throw new Error('Empty reply');
+                // A runaway or hostile backend must not be able to flood the page.
+                reply = reply.slice(0, cfg.maxReplyLength);
                 // Pad instant answers so they do not feel robotic.
                 var wait = Math.max(0, cfg.typingDelay - (Date.now() - started));
                 return new Promise(function (resolve) { setTimeout(function () { resolve(reply); }, wait); });
             }).catch(function () {
+                failed = true;
                 return cfg.errorMessage;
-            }).then(function (reply) {
-                var answer = String(reply);
+            }).then(function (answer) {
                 if (typing.parentNode) typing.parentNode.removeChild(typing);
                 addMessage('assistant', answer);
-                history.push({ role: 'assistant', content: answer });
+                if (failed) {
+                    // The apology is not something the assistant said, so it stays out of the
+                    // history; the unanswered question goes too, so the roles keep alternating
+                    // and a retry starts clean.
+                    var index = history.lastIndexOf(userTurn);
+                    if (index !== -1) history.splice(index, 1);
+                } else {
+                    history.push({ role: 'assistant', content: answer });
+                }
                 setPending(false);
             });
         }
@@ -298,7 +387,7 @@
         function open() {
             panel.classList.add('is-open');
             launcher.setAttribute('aria-expanded', 'true');
-            launcher.innerHTML = ICON_CLOSE;
+            setIcon(launcher, ICON_CLOSE);
             launcher.setAttribute('aria-label', 'Close chat');
             if (!greeted) {
                 greeted = true;
@@ -310,7 +399,7 @@
         function close() {
             panel.classList.remove('is-open');
             launcher.setAttribute('aria-expanded', 'false');
-            launcher.innerHTML = ICON_CHAT;
+            setIcon(launcher, ICON_CHAT);
             launcher.setAttribute('aria-label', cfg.launcherLabel);
         }
 
