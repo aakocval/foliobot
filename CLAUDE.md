@@ -16,7 +16,7 @@ widget/profile-engine.js   scripted answers from a profile: FolioBot.fromProfile
 widget/README.md           embed usage, config table, and the endpoint contract
 schema/profile.schema.json JSON Schema (draft-07) for profile.json
 examples/                  profile.example.json (a generic example; must always validate against the schema) and demo.html
-tests/                     node:test suite for the answer engine
+tests/                     node:test suites for the answer engine and the widget's config logic
 docs/LEARNING.md           the owner's roadmap (v1 scripted -> v2 FastAPI -> streaming -> RAG -> tools -> evals)
 server/                    Python backend (FastAPI + Pydantic), to be written by the owner
 evals/                     test questions and runner, to be written by the owner
@@ -32,7 +32,7 @@ evals/                     test questions and runner, to be written by the owner
 ## Widget conventions (`widget/`)
 
 - **Dependency-free, no build step, one file per concern.** Classic scripts in ES5 style (`var`, `function`), matching the owner's portfolio. Don't add a bundler or runtime dependency without discussing it.
-- **Shadow DOM** (open mode). All CSS lives inside the shadow root, with class names prefixed `fb-`. The only things crossing the boundary are CSS custom properties, which are the theming API: `--fb-accent`, `--fb-cursor`. Keep `cursor: var(--fb-cursor, ...)` on clickable elements, because host pages use it to hide the native cursor.
+- **Shadow DOM** (open mode). All CSS lives inside the shadow root, with class names prefixed `fb-`. The only things crossing the boundary are CSS custom properties, which are the theming API: `--fb-bg`, `--fb-text`, `--fb-accent`, `--fb-font`, `--fb-cursor`. Derive secondary colours (borders, bubbles, muted text) from the text colour with `tint()` rather than hardcoding them, so light, dark and custom themes all stay coherent. Keep `cursor: var(--fb-cursor, ...)` on clickable elements, because host pages use it to hide the native cursor.
 - **Never use `innerHTML` with message text.** Visitor and bot text is rendered with `textContent` and created `<a>` nodes (`renderText`). The widget has no `innerHTML` at all (icons use `setIcon`/`createElementNS`), which keeps it working under Trusted Types; keep it that way. Keep every regex quantifier that comes before a fixed character bounded (see `renderText`), so bot text can't trigger quadratic backtracking.
 - Conversation state lives in memory only. No cookies, no localStorage.
 - Accessibility is part of the contract: dialog role, `role="log"` + `aria-live`, Esc closes, focus returns to the launcher, `prefers-reduced-motion` respected.
@@ -53,9 +53,9 @@ There is no build. To try the widget, serve the repo over HTTP (the engine loads
 python3 -m http.server
 ```
 
-Open `http://localhost:8000/examples/demo.html` (add `#open` to start with the chat open). There are no automated tests for the widget UI; check it in a browser and look at the console.
+Open `http://localhost:8000/examples/demo.html` (add `#open` to start with the chat open). Automated tests can't see how the widget looks; check visual changes in a browser and look at the console.
 
-Tests: `node --test tests/*.test.js` (Node's built-in runner, no dependencies; note the glob, since passing the folder alone fails on Node 25). They cover `widget/profile-engine.js`, including a check that every suggestion in `examples/profile.example.json` is answerable. When you change the engine or add a profile field, add or update a test.
+Tests: `node --test tests/*.test.js` (Node's built-in runner, no dependencies; note the glob, since passing the folder alone fails on Node 25). `tests/profile-engine.test.js` covers `widget/profile-engine.js`, including a check that every suggestion in `examples/profile.example.json` is answerable. `tests/widget.test.js` covers `widget/foliobot.js` config logic (themes, colours, accent, greeting) against a minimal fake DOM defined in that file; extend the fake only with the DOM calls the widget actually makes, and don't add jsdom or another dependency. When you change the engine, the widget's config handling, or add a profile field, add or update a test.
 
 Syntax check: `node --check widget/foliobot.js && node --check widget/profile-engine.js`.
 
@@ -64,6 +64,7 @@ Schema validation is manual for now (VS Code flags errors when a profile has `"$
 ## Git
 
 - Commit as `Val Moratalla <aakocval@gmail.com>`, with **no** `Co-Authored-By` line.
+- No Claude or AI attribution anywhere: no "Generated with Claude Code" footer in PR descriptions, no AI credit in commit messages, code comments, file headers, or copyright notices. The copyright holder is Val Moratalla.
 - Pushing with `git push` can fail on saved credentials, and the active `gh` account may be a work account. Push with the `aakocval` token:
   `GH_TOKEN=$(gh auth token --user aakocval) git -c credential.helper= -c credential.helper='!gh auth git-credential' push`
 - Never commit API keys or `.env` files. Commit a `.env.example` with empty values instead. Don't ignore `uv.lock` or other lockfiles; commit them.

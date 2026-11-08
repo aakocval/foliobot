@@ -25,12 +25,25 @@
         <h1>FolioBot demo</h1>
         <p>This page loads the widget and the answer engine, then feeds them <code>profile.example.json</code>. Open the chat button in the corner and ask about the example person's projects, tech stack, or contact details.</p>
         <p>Edit <code>examples/profile.example.json</code> and reload to see the answers change.</p>
+        <p>
+            <label for="theme">Widget theme:</label>
+            <select id="theme">
+                <option value="auto">Auto (system)</option>
+                <option value="light">Light</option>
+                <option value="dark">Dark</option>
+                <option value="custom">Custom (navy)</option>
+            </select>
+        </p>
         <p class="note" id="file-note">This page loads its profile with <code>fetch</code>, which browsers block on <code>file://</code>. Serve the repository over HTTP instead: run <code>python3 -m http.server</code> in the repo folder and open <code>http://localhost:8000/examples/demo.html</code>.</p>
     </main>
 
     <script src="../widget/foliobot.js"></script>
     <script src="../widget/profile-engine.js"></script>
     <script>
+        document.getElementById('theme').addEventListener('change', function (e) {
+            // The custom colours are only an example; pass any CSS colours.
+            FolioBot.setTheme(e.target.value, { background: '#0f172a', text: '#e2e8f0', accent: '#38bdf8' });
+        });
         if (location.protocol === 'file:') {
             document.getElementById('file-note').style.display = 'block';
         } else {

@@ -9,7 +9,7 @@ Drop in a `<script>` tag, describe yourself once, and visitors to your portfolio
 
 ## What works today
 
-- **Widget** ([`widget/`](widget)): one dependency-free file (`foliobot.js`), Shadow DOM so your site's CSS cannot break it, accessible (dialog role, live region, Esc to close, reduced-motion aware), and messages are rendered without `innerHTML`.
+- **Widget** ([`widget/`](widget)): one dependency-free file (`foliobot.js`), Shadow DOM so your site's CSS cannot break it, accessible (dialog role, live region, Esc to close, reduced-motion aware), and messages are rendered without `innerHTML`. Light, dark, auto (follows the visitor's system setting) and custom-colour themes.
 - **Profile engine** ([`widget/profile-engine.js`](widget/profile-engine.js)): turns a `profile.json` into scripted answers. No network, no cost, no API key.
 - **Schema** ([`schema/profile.schema.json`](schema/profile.schema.json)): the shape of `profile.json`, with editor autocomplete and validation. Start from [`examples/profile.example.json`](examples/profile.example.json).
 
@@ -27,6 +27,39 @@ Drop in a `<script>` tag, describe yourself once, and visitors to your portfolio
 
 To load the files from a free CDN instead of copying them, see [Use it from a CDN](widget/README.md#use-it-from-a-cdn-free). Full options and the backend contract are in [`widget/README.md`](widget/README.md).
 
+### Customize the opening message
+
+The header, the first message and the suggested questions come from the `bot` block of your `profile.json`:
+
+```json
+"bot": {
+  "title": "Ask about Alex",
+  "greeting": "Hi! Ask me about Alex's projects, tech stack, or how to get in touch.",
+  "suggestions": ["What projects has Alex built?", "How can I contact Alex?"]
+}
+```
+
+Set `"greeting": ""` to open on the suggestions alone. Each suggestion needs an answer in your profile; see [Customize the opening message](widget/README.md#customize-the-opening-message) for how to make sure it has one.
+
+### Match your site
+
+The widget follows the visitor's light/dark system setting by default. Pass a second argument to `fromProfile` to fix the theme or use your own colours:
+
+```js
+FolioBot.init(FolioBot.fromProfile(profile, {
+  theme: 'custom',                  // 'auto' (default), 'light', 'dark' or 'custom'
+  colors: {                         // used by 'custom'
+    background: '#0f172a',
+    text: '#e2e8f0',
+    accent: '#38bdf8'               // optional hover and focus colour
+  }
+}));
+
+FolioBot.setTheme('light');         // switch later, e.g. from your site's own theme toggle
+```
+
+Borders, bubbles and muted text are derived from `text`, so two colours are enough. Hover is neutral by default (it brightens to the theme's text colour); set `accent` for a brand colour in every theme. You can also theme it from your stylesheet with CSS variables. See [Theming](widget/README.md#theming).
+
 ## Try it
 
 Serve the repo over HTTP (the demo loads its profile with `fetch`, which browsers block on `file://`):
@@ -35,17 +68,17 @@ Serve the repo over HTTP (the demo loads its profile with `fetch`, which browser
 python3 -m http.server
 ```
 
-Then open <http://localhost:8000/examples/demo.html>. Edit `examples/profile.example.json` and reload to change the answers.
+Then open <http://localhost:8000/examples/demo.html>. Edit `examples/profile.example.json` and reload to change the answers. The theme menu on the page switches the widget between auto, light, dark and a custom example.
 
 ## Tests
 
-The answer engine has a dependency-free test suite using Node's built-in runner (Node 18 or newer):
+The answer engine and the widget's config logic (themes, colours, greeting) have a dependency-free test suite using Node's built-in runner (Node 18 or newer):
 
 ```bash
 node --test tests/*.test.js
 ```
 
-There are no automated tests for the widget UI yet.
+The widget tests run against a small fake DOM, so they check what the widget sets, not how it looks. Check visual changes in the demo page.
 
 ## Roadmap
 
