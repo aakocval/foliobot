@@ -40,7 +40,9 @@ The file's shape is defined by [`profile.schema.json`](../schema/profile.schema.
 | --- | --- | --- |
 | `title` | `'Chat'` | Panel header text |
 | `greeting` | `'Hi! How can I help?'` | First bot message, shown when the panel first opens |
-| `suggestions` | `[]` | Quick-question buttons, shown until the first message is sent |
+| `suggestions` | `[]` | Quick-question links, shown until the first message is sent |
+| `maxSuggestions` | `3` | How many of `suggestions` are shown; extras are ignored |
+| `maxHeight` | `400` | Max height of the open panel in px. It grows with the conversation up to this, then scrolls |
 | `placeholder` | `'Type your question...'` | Input placeholder |
 | `accent` | `'#b81828'` | Launcher, send button, and user-bubble colour |
 | `position` | `{ right: 24, bottom: 24 }` | Launcher offset from the viewport corner, in px |

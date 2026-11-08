@@ -128,7 +128,7 @@
         var bot = profile.bot || {};
         var config = {
             title: bot.title || 'Ask about ' + profile.name,
-            greeting: bot.greeting || "Hi! Ask me about " + profile.name + "'s work, tech stack, or how to get in touch.",
+            greeting: bot.greeting || "Hi! I'm a small assistant for this portfolio. Ask me about " + profile.name + ".",
             suggestions: bot.suggestions || [],
             respond: createResponder(profile)
         };
