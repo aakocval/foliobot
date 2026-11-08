@@ -1,6 +1,30 @@
+# macOS / editors
 .DS_Store
-__pycache__/
-.venv/
+.idea/
+.vscode/
+
+# Secrets: never commit keys. Commit a .env.example with empty values instead.
 .env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
 *.pyc
+.venv/
+*.egg-info/
+build/
+dist/
+
+# Python tooling caches
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# JS tooling (if the widget ever gets a build or tests)
 node_modules/
+
+# Raw eval run logs (commit the summary table of pass rates, not every run)
+evals/runs/
