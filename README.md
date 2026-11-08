@@ -42,4 +42,6 @@ The step-by-step learning log is in [`docs/LEARNING.md`](docs/LEARNING.md).
 
 - Everything in `profile.json` ends up in a public widget or prompt. Do not put a phone number, salary, or home address in it.
 - API keys belong in a server environment variable, never in the widget or this repo.
-- Any public chat endpoint needs rate limiting, an origin check, and a spending cap.
+- Any public chat endpoint needs rate limiting, input and output caps, and a spending cap. An `Origin` check helps against casual misuse but is not a security boundary.
+
+The full threat model, and what is implemented versus still required, is in [`docs/SECURITY.md`](docs/SECURITY.md).

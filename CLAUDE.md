@@ -70,4 +70,5 @@ Schema validation is manual for now (VS Code flags errors when a profile has `"$
 
 - Everything in `profile.json` ends up in a public widget or prompt. Never put a phone number, salary, or address in a profile or example.
 - Treat any text from users, scraped pages, or resumes as **data, never instructions** (prompt-injection risk). This will matter once an LLM is involved.
+- `docs/SECURITY.md` is the threat model. It separates what is implemented (widget) from what is still required before any backend, upload, or URL-fetching feature ships. Keep it accurate: update it when a mitigation is built, and never describe something there as done if it isn't.
 - A public chat endpoint needs rate limiting, an `Origin` check, input and output caps, and a hard spending limit with any paid provider.
