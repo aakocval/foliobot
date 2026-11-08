@@ -16,7 +16,7 @@ widget/profile-engine.js   scripted answers from a profile: FolioBot.fromProfile
 widget/README.md           embed usage, config table, and the endpoint contract
 schema/profile.schema.json JSON Schema (draft-07) for profile.json
 examples/                  profile.example.json (a generic example; must always validate against the schema) and demo.html
-tests/                     node:test suite for the answer engine
+tests/                     node:test suites for the answer engine and the widget's config logic
 docs/LEARNING.md           the owner's roadmap (v1 scripted -> v2 FastAPI -> streaming -> RAG -> tools -> evals)
 server/                    Python backend (FastAPI + Pydantic), to be written by the owner
 evals/                     test questions and runner, to be written by the owner
@@ -53,9 +53,9 @@ There is no build. To try the widget, serve the repo over HTTP (the engine loads
 python3 -m http.server
 ```
 
-Open `http://localhost:8000/examples/demo.html` (add `#open` to start with the chat open). There are no automated tests for the widget UI; check it in a browser and look at the console.
+Open `http://localhost:8000/examples/demo.html` (add `#open` to start with the chat open). Automated tests can't see how the widget looks; check visual changes in a browser and look at the console.
 
-Tests: `node --test tests/*.test.js` (Node's built-in runner, no dependencies; note the glob, since passing the folder alone fails on Node 25). They cover `widget/profile-engine.js`, including a check that every suggestion in `examples/profile.example.json` is answerable. When you change the engine or add a profile field, add or update a test.
+Tests: `node --test tests/*.test.js` (Node's built-in runner, no dependencies; note the glob, since passing the folder alone fails on Node 25). `tests/profile-engine.test.js` covers `widget/profile-engine.js`, including a check that every suggestion in `examples/profile.example.json` is answerable. `tests/widget.test.js` covers `widget/foliobot.js` config logic (themes, colours, accent, greeting) against a minimal fake DOM defined in that file; extend the fake only with the DOM calls the widget actually makes, and don't add jsdom or another dependency. When you change the engine, the widget's config handling, or add a profile field, add or update a test.
 
 Syntax check: `node --check widget/foliobot.js && node --check widget/profile-engine.js`.
 

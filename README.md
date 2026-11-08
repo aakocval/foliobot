@@ -72,13 +72,13 @@ Then open <http://localhost:8000/examples/demo.html>. Edit `examples/profile.exa
 
 ## Tests
 
-The answer engine has a dependency-free test suite using Node's built-in runner (Node 18 or newer):
+The answer engine and the widget's config logic (themes, colours, greeting) have a dependency-free test suite using Node's built-in runner (Node 18 or newer):
 
 ```bash
 node --test tests/*.test.js
 ```
 
-There are no automated tests for the widget UI yet.
+The widget tests run against a small fake DOM, so they check what the widget sets, not how it looks. Check visual changes in the demo page.
 
 ## Roadmap
 
